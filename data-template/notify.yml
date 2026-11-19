@@ -1,0 +1,34 @@
+# Уведомления для пары. Положить в репозиторий ДАННЫХ как .github/workflows/notify.yml
+# (приложение само показывает этот текст в «Профиль → Уведомления»). Подробно — docs/setup.md.
+name: notify
+on:
+  push:
+    branches: [main]
+    paths: ['u/**']
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: notify
+  cancel-in-progress: false
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - uses: actions/checkout@v4
+        with: { repository: veracerkof-debug/Bible.vidget, path: .tandem, sparse-checkout: "/tools/\n/src/core/canon.js", sparse-checkout-cone-mode: false }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: |
+          echo '{"type":"module"}' > .tandem/package.json
+          npm i --no-save --prefix .tandem web-push
+      - run: node .tandem/tools/notify.mjs
+        env:
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          NOTIFY_BEFORE: ${{ github.event.before }}
+          NOTIFY_AFTER: ${{ github.sha }}

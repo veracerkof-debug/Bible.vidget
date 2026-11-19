@@ -1,0 +1,21 @@
+{
+  "name": "tandem-bible",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Чтение Библии вдвоём: общий ритм, отчёты с фото, подтверждения, уведомления. Данные — в вашем приватном репозитории GitHub.",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "test": "vitest run",
+    "e2e": "node tests/e2e/run.mjs",
+    "bible:import": "node tools/import-bible.mjs"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0",
+    "vitest": "^2.1.0",
+    "playwright": "^1.48.0"
+  }
+}
