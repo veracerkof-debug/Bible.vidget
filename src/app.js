@@ -66,26 +66,27 @@ export const app = {
   },
 
   // ——— подключение к репозиторию данных ———
-  async connect({ token, owner, repo, create, draft }) {
+  // Один токен на пару (его создаёт создатель и отдаёт в ссылке-приглашении). Участник — не аккаунт GitHub, а идентификатор,
+  // созданный в приложении. Новое устройство того же человека входит как «уже существующий участник» (asMember).
+  async connect({ token, owner, repo, create, draft, asMember }) {
     const gh = new GitHub({ token, owner, repo });
-    const user = await gh.user();
-    const info = await gh.repoInfo();
+    const info = await gh.repoInfo(); // 401 — токен не принят; 404 — нет репозитория или доступа
     if (!info.permissions?.push) throw new GhError('forbidden', 403, 'no push');
-    const cfg = { ...this.cfg, token, owner, repo, branch: info.default_branch, login: user.login, ghAvatar: user.avatar_url || null };
     const prev = { ...this.cfg };
-    this.save(cfg); this.attach();
+    const login = asMember || 'm' + newId();
+    this.save({ token, owner, repo, branch: info.default_branch, login }); this.attach();
     try {
       await this.repo.load(); await this.repo.sync();
-      const members = Object.keys(this.repoMembers());
-      if (!members.includes(user.login) && members.length >= 2) throw new GhError('full', 0, 'pair is full');
+      const found = this.repoMembers();
+      if (!asMember && Object.keys(found).length >= 2) { const e = new GhError('full', 0, 'pair is full'); e.members = Object.entries(found).map(([id, p]) => ({ id, name: p.name })); throw e; }
       if (!this.repo.has(P.couple)) {
         if (!create) throw new GhError('nocouple', 0, 'no couple.json');
-        await this.repo.writeJSON(P.couple, { v: 1, id: newId(), created: new Date().toISOString(), creator: user.login }, 'Создание пары');
+        await this.repo.writeJSON(P.couple, { v: 1, id: newId(), created: new Date().toISOString(), creator: login }, 'Создание пары');
       }
-      const old = this.repo.get(P.profile(user.login)) || {};
-      const prof = { name: draft?.name || old.name || user.login, lang: draft?.lang || old.lang || this.cfg.lang, color: draft?.color || old.color || '#946B3E', tz: tz(), joined: old.joined || new Date().toISOString(), remind: old.remind || { on: false, hour: 20 }, avatar: old.avatar || null };
-      if (draft?.avatar) { prof.avatar = P.avatar(user.login); await this.repo.writeFile(prof.avatar, draft.avatar, 'Аватар'); }
-      await this.repo.writeJSON(P.profile(user.login), prof, 'Профиль');
+      const old = this.repo.get(P.profile(login)) || {};
+      const prof = { name: old.name || draft?.name || 'Tandem', lang: draft?.lang || old.lang || this.cfg.lang, color: old.color || draft?.color || '#946B3E', tz: tz(), joined: old.joined || new Date().toISOString(), remind: old.remind || { on: false, hour: 20 }, avatar: old.avatar || null };
+      if (draft?.avatar && !old.avatar) { prof.avatar = P.avatar(login); await this.repo.writeFile(prof.avatar, draft.avatar, 'Аватар'); }
+      await this.repo.writeJSON(P.profile(login), prof, 'Профиль');
       this.save({ name: prof.name, lang: prof.lang });
       this.rebuild(); this.emit();
     } catch (e) { this.repo = null; this.cfg = prev; try { localStorage.setItem(CFG, JSON.stringify(prev)); } catch { /* ok */ } throw e; }

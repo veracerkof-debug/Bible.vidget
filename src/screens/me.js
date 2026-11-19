@@ -9,7 +9,8 @@ import { openAnniv } from './anniv.js';
 import { openNotifs } from './notifs.js';
 import { isIOS, isStandalone } from '../core/push.js';
 
-export const inviteLink = () => `${location.origin}${location.pathname}#/join/${app.cfg.owner}/${app.cfg.repo}`;
+// В ссылке — токен пары (после «#» он не уходит ни на какой сервер). Отправлять только партнёру.
+export const inviteLink = () => `${location.origin}${location.pathname}#/join/${app.cfg.owner}/${app.cfg.repo}/${encodeURIComponent(app.cfg.token)}`;
 
 export function me() {
   const el = h('div', { class: 'screen me' });
@@ -26,6 +27,7 @@ export function me() {
       h('div', { class: 'card pro' }, av, h('div', { class: 'grow' }, nameIn, h('div', { class: 'muted' }, pp ? `${mine.name} & ${pp.name}` : '@' + app.me))),
       h('div', { class: 'cap' }, t('me.partner')),
       pp ? h('div', { class: 'card li' }, avatar(app.partner, 44), h('b', { class: 'grow' }, pp.name)) : invite(),
+      pp ? h('button', { class: 'lnk', onclick: () => sheet({ title: t('me.inviteAgain'), body: h('div', { class: 'sh-body' }, h('h3', { class: 'sh-title' }, t('me.inviteTitle')), invite(true)) }) }, icon('link', 16), t('me.inviteTitle')) : null,
       h('div', { class: 'cap' }, t('me.together')),
       h('div', { class: 'card list' },
         navRow('heart', t('an.title'), `${m.anniversaries.length || ''}`, () => openAnniv()),
@@ -48,11 +50,10 @@ export function me() {
   const goal = (d) => { app.save({ weekGoal: Math.min(7, Math.max(1, (app.cfg.weekGoal ?? 5) + d)) }); app.rebuild(); app.emit(); render(); };
   const field = (l, c) => h('div', { class: 'fld' }, h('label', {}, l), c);
   const navRow = (ic, label, val, fn) => h('button', { class: 'li btn-li', onclick: fn }, icon(ic, 22), h('div', { class: 'grow' }, label), val ? h('span', { class: 'muted' }, val) : null, icon('right', 18, 'dim'));
-  function invite() {
+  function invite(always) {
     const link = inviteLink();
-    return h('div', { class: 'card inv' }, h('p', {}, t('me.inviteText')),
-      h('ol', { class: 'steps' }, h('li', {}, t('me.inv1', { repo: `${app.cfg.owner}/${app.cfg.repo}` }), ' ', h('a', { href: `https://github.com/${app.cfg.owner}/${app.cfg.repo}/settings/access`, target: '_blank', rel: 'noopener' }, t('me.open'))), h('li', {}, t('me.inv2'))),
-      h('code', { class: 'key' }, link),
+    return h('div', { class: 'card inv' }, h('p', {}, t(always ? 'me.inviteAgain' : 'me.inviteText')),
+      h('code', { class: 'key' }, link), h('p', { class: 'note' }, t('me.inviteWarn')),
       h('div', { class: 'row gap' }, h('button', { class: 'btn', onclick: async () => { try { await navigator.clipboard.writeText(link); toast(t('common.copied')); } catch { toast(link); } } }, icon('copy', 18), t('common.copy')),
         navigator.share ? h('button', { class: 'btn', onclick: () => navigator.share({ title: t('app.name'), text: t('me.shareText'), url: link }).catch(() => {}) }, icon('share', 18), t('me.share')) : null));
   }

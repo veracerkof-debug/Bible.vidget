@@ -5,13 +5,13 @@ import { t, setLang } from './i18n/index.js';
 import { home } from './screens/home.js';
 import { word } from './screens/word.js';
 import { chat } from './screens/chat.js';
-import { history } from './screens/history.js';
+import { history as historyScreen } from './screens/history.js';
 import { me } from './screens/me.js';
 import { onboarding } from './screens/onboarding.js';
 
 const root = document.getElementById('app');
 const TABS = [['home', 'home'], ['word', 'book'], ['chat', 'chat'], ['history', 'history'], ['me', 'user']];
-const SCREENS = { home, word, chat, history, me };
+const SCREENS = { home, word, chat, history: historyScreen, me };
 let cur = null, curName = null, shell = null;
 
 const pendingAcks = () => {
@@ -58,8 +58,16 @@ async function start() {
   const ok = await app.boot();
   const { name, rest } = parseHash();
   if (!ok) {
-    const join = name === 'join' && rest.length >= 2 ? { owner: rest[0], repo: rest[1] } : null;
+    // ссылка-приглашение: #/join/<владелец>/<репозиторий>/<токен>; токен сразу убираем из адреса и истории
+    const join = name === 'join' && rest.length >= 3 ? { owner: rest[0], repo: rest[1], token: decodeURIComponent(rest.slice(2).join('/')) } : null;
+    if (join) history.replaceState(null, '', location.pathname + '#/start');
     onboarding(root, { join }); return;
+  }
+  // ссылка-приглашение при уже подключённом устройстве = новый токен пары (после его замены)
+  if (name === 'join' && rest.length >= 3 && rest[0] === app.cfg.owner && rest[1] === app.cfg.repo) {
+    const tok = decodeURIComponent(rest.slice(2).join('/'));
+    if (tok && tok !== app.cfg.token) { app.save({ token: tok }); app.repo.gh.token = tok; }
+    history.replaceState(null, '', location.pathname + '#/home');
   }
   app.start(); mountShell();
 }
